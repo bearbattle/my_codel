@@ -1,7 +1,7 @@
 /**
  * My CoDel Implementation
  * By Bear
- * 2021.07.30 - 2021.08.04
+ * 2021.06.30 - 2021.07.04
  * @see: https://queue.acm.org/appendices/codel.html
  * */
 
@@ -83,7 +83,25 @@ struct my_codel_state {
 	my_codel_time_t first_above_time;
 	my_codel_time_t drop_next;
 	uint32_t count;
+	uint32_t last_count;
+	my_codel_time_t ldelay;
 	my_flag_t dropping;
+};
+
+/**
+ * struct codel_stats - contains codel shared variables and stats
+ * @maxpacket:	largest packet we've seen so far
+ * @drop_count:	temp count of dropped packets in dequeue()
+ * @drop_len:	bytes of dropped packets in dequeue()
+ * ecn_mark:	number of packets we ECN marked instead of dropping
+ * ce_mark:	number of packets CE marked because sojourn time was above ce_threshold
+ */
+struct codel_stats {
+	u32		maxpacket;
+	u32		drop_count;
+	u32		drop_len;
+	u32		ecn_mark;
+	u32		ce_mark;
 };
 
 /* CONSTANTS */
@@ -94,7 +112,13 @@ const my_codel_time_t interval = MS2TIME(100);
 /* Maximum packet size in bytes (should use interface MTU) */
 const u_int maxpacket = 512;
 
+/* Some function pointer type for add into my_queue_t */
+typedef int (*enqueue_func_t)(packet_t *pkt, struct Qdisc *sch);
+typedef packet_t* (*dequeue_func_t)(void *ctx);
+typedef u32 (*byte_func_t)(struct Qdisc *sch);
+
 /**
+ * my_queue_t
  * Base Queue Class for queue objects
  * @method enqueue()
  * 	Add a packet to queue.
@@ -103,5 +127,47 @@ const u_int maxpacket = 512;
  * @method bytes() Returns the current queue size in bytes.
  * 	This can be an approximate value.
  */
+typedef struct {
+	enqueue_func_t enqueue;
+	dequeue_func_t dequeue;
+	byte_func_t bytes;
+} my_queue_t;
+
+/**
+ * my_enqueue
+ * Add a packet to current queue
+ * @param {packet_t *} pkt
+ * 	The packet to be added to the queue.
+ * @param {struct Qdisc *} sch
+ * 	Current Queue as strcut Queue Discipline
+ * @return {int} 0 if no error
+ */
+static enqueue_func_t my_enqueue(packet_t *pkt, struct Qdisc *sch){
+	return qdisc_enqueue_tail(pkt, sch);
+}
+
+/**
+ * my_dequeue
+ * Pop a packet from current queue
+ * @param {void *} ctx
+ * 	Context of current queue
+ * 	Will be converted to Qdisc
+ * @return {packet_t *}
+ * 	Popped packet. NULL if error or empty queue.
+ */
+static dequeue_func_t my_dequeue(void *ctx){
+	struct Qdisc *sch = ctx;
+	packet_t *pkt = __qdisc_dequeue_head(&sch->q);
+
+	if(skb)
+		sch->qstats.backlog -= qdisc_pkt_len(pkt);
+
+	/* prefetch(&skb->end); */
+	return skb;
+}
+
+static bytes_func_t my_bytes(struct Qdisc *sch){
+	return sch->qstats.backlog;
+}
 
 #endif /* LINUX_5_8_MY_CODEL_H */
