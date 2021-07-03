@@ -34,7 +34,7 @@ static int my_codel_dump(struct Qdisc *sch, struct sk_buff *skb);
 static int my_codel_dump_stats(struct Qdisc *sch, struct gnet_dump *d);
 
 static struct Qdisc_ops my_codel_qdisc_ops __read_mostly = {
-	.id = "codel",
+	.id = "my_codel",
 	.priv_size = sizeof(struct my_codel_sched_data),
 
 	.enqueue = my_codel_qdisc_enqueue,
