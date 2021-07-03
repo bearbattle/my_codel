@@ -60,5 +60,5 @@ static void __exit my_codel_module_exit(void)
 
 module_init(my_codel_module_init) module_exit(my_codel_module_exit)
 
-	MODULE_DESCRIPTION("My CoDel Implementation");
+MODULE_DESCRIPTION("My CoDel Implementation");
 MODULE_AUTHOR("Xiong Huchao");

@@ -97,11 +97,11 @@ struct my_codel_state {
  * ce_mark:	number of packets CE marked because sojourn time was above ce_threshold
  */
 struct codel_stats {
-	u32		maxpacket;
-	u32		drop_count;
-	u32		drop_len;
-	u32		ecn_mark;
-	u32		ce_mark;
+	u32 maxpacket;
+	u32 drop_count;
+	u32 drop_len;
+	u32 ecn_mark;
+	u32 ce_mark;
 };
 
 /* CONSTANTS */
@@ -114,8 +114,8 @@ const u_int maxpacket = 512;
 
 /* Some function pointer type for add into my_queue_t */
 typedef int (*enqueue_func_t)(packet_t *pkt, struct Qdisc *sch);
-typedef packet_t* (*dequeue_func_t)(void *ctx);
-typedef u32 (*byte_func_t)(struct Qdisc *sch);
+typedef packet_t *(*dequeue_func_t)(void *ctx);
+typedef u32 (*bytes_func_t)(struct Qdisc *sch);
 
 /**
  * my_queue_t
@@ -130,7 +130,7 @@ typedef u32 (*byte_func_t)(struct Qdisc *sch);
 typedef struct {
 	enqueue_func_t enqueue;
 	dequeue_func_t dequeue;
-	byte_func_t bytes;
+	bytes_func_t bytes;
 } my_queue_t;
 
 /**
@@ -142,7 +142,8 @@ typedef struct {
  * 	Current Queue as strcut Queue Discipline
  * @return {int} 0 if no error
  */
-static enqueue_func_t my_enqueue(packet_t *pkt, struct Qdisc *sch){
+static int my_enqueue(packet_t *pkt, struct Qdisc *sch)
+{
 	return qdisc_enqueue_tail(pkt, sch);
 }
 
@@ -155,18 +156,28 @@ static enqueue_func_t my_enqueue(packet_t *pkt, struct Qdisc *sch){
  * @return {packet_t *}
  * 	Popped packet. NULL if error or empty queue.
  */
-static dequeue_func_t my_dequeue(void *ctx){
+static packet_t *my_dequeue(void *ctx)
+{
 	struct Qdisc *sch = ctx;
 	packet_t *pkt = __qdisc_dequeue_head(&sch->q);
 
-	if(skb)
+	if (pkt)
 		sch->qstats.backlog -= qdisc_pkt_len(pkt);
 
 	/* prefetch(&skb->end); */
-	return skb;
+	return pkt;
 }
 
-static bytes_func_t my_bytes(struct Qdisc *sch){
+/**
+ * my_bytes
+ * Get current queue size in byte
+ * @param {struct Qdisc *} sch
+ * 	Current Queue as strcut Queue Discipline
+ * @return {u32}
+ * 	Current Queue size in byte
+ */
+static u32 my_bytes(struct Qdisc *sch)
+{
 	return sch->qstats.backlog;
 }
 
