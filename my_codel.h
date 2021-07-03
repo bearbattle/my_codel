@@ -106,7 +106,7 @@ struct my_codel_stats {
 struct my_codel_control {
 	my_codel_time_t ce_threshold;
 	bool ecn;
-}
+};
 
 /* CONSTANTS */
 /* Target queue delay (5 ms) */
@@ -196,23 +196,27 @@ struct my_codel_sched_data {
 	u32 drop_overlimit;
 };
 
-static void my_codel_state_init(struct my_codel_state *state) {
+static void my_codel_state_init(struct my_codel_state *state)
+{
 	state->first_above_time = 0;
 	state->drop_next = 0;
 	state->last_count = state->count = 0;
 	state->dropping = false;
 }
 
-static void my_codel_stats_init(struct my_codel_stats *stats) {
+static void my_codel_stats_init(struct my_codel_stats *stats)
+{
 	stats->maxpacket = 0;
 }
 
-static void my_codel_control_init(struct my_codel_control *control) {
+static void my_codel_control_init(struct my_codel_control *control)
+{
 	control->ce_threshold = INT_MAX;
 	control->ecn = false;
 }
 
-static int my_codel_enqueue(packet_t *pkt, struct Qdisc *sch) {
+static int my_codel_enqueue(packet_t *pkt, struct Qdisc *sch)
+{
 	my_codel_set_enqueue_time(pkt);
 	base_queue.enqueue(pkt, sch);
 }
@@ -223,14 +227,15 @@ static int my_codel_enqueue(packet_t *pkt, struct Qdisc *sch) {
  * of dropping until the queue is controlled (sojourn time goes below target).
  * This is the control law that governs the servo. It has this form because of
  * the sqrt(p) dependence of TCP throughput on drop probability.1 Note that for
- * embedded systems or kernel implementation the inverse sqrt can be computed 
+ * embedded systems or kernel implementation the inverse sqrt can be computed
  * efficiently using only integer multiplication.
  */
-static my_codel_time_t my_codel_control_law(my_codel_time_t t, uint32_t count) {
+static my_codel_time_t my_codel_control_law(my_codel_time_t t, uint32_t count)
+{
 	my_codel_time_t val = interval;
 	u32 sqrt = int_sqrt(count);
 	do_div(val, sqrt);
-	return t + (mycodel_time_t)val;
+	return t + (my_codel_time_t)val;
 }
 
 /**
@@ -243,20 +248,22 @@ static my_codel_time_t my_codel_control_law(my_codel_time_t t, uint32_t count) {
  * @ok_to_drop flag_t whether it is OK to drop
  */
 typedef struct {
-      packet_t* p;
-      flag_t ok_to_drop;
+	packet_t *p;
+	my_flag_t ok_to_drop;
 } my_dodeque_result;
 
-static my_dodeque_result my_codel_dodeque(time_t now, Qdisc *sch) {
-	my_dodeque_result r = {
-		.p = base_queue.dequeue(sch),
-		.ok_to_drop = false
-	};
+static my_dodeque_result my_codel_dodeque(my_codel_time_t now,
+					  struct Qdisc *sch)
+{
+	my_dodeque_result r = { .p = base_queue.dequeue(sch),
+				.ok_to_drop = false };
 	if (r.p == NULL) {
 		first_above_time = 0;
 	} else {
-		my_odel_time_t sojourn_time = now - my_codel_get_enqueue_time(r.p);
-		if (sojourn_time < target || base_queue.bytes(sch) < maxpacket) {
+		my_codel_time_t sojourn_time =
+			now - my_codel_get_enqueue_time(r.p);
+		if (my_codel_time_before(sojourn_time, target) ||
+		    base_queue.bytes(sch) < maxpacket) {
 			/* went below so we'll stay below for at least interval */
 			first_above_time = 0;
 		} else {
@@ -264,7 +271,7 @@ static my_dodeque_result my_codel_dodeque(time_t now, Qdisc *sch) {
 				/* just went above from below. if we stay above */
 				/* for at least interval we'll say it's ok to drop */
 				first_above_time = now + interval;
-			} else if (now >= first_above_time) {
+			} else if (my_codel_time_after(now, first_above_time)) {
 				r.ok_to_drop = 1;
 			}
 		}
@@ -274,12 +281,12 @@ static my_dodeque_result my_codel_dodeque(time_t now, Qdisc *sch) {
 
 /**
  * All of the work of CoDel is done here. There are two branches:
- * 		if we're in packet-dropping state (meaning that the 
+ * 		if we're in packet-dropping state (meaning that the
  * 			queue-sojourn time has gone above target and
  * 		 	hasn't come down yet),
  * 		 	then we need to check if it's time to leave or
  * 				if it's time for the next drop(s);
- *  	if we're not in dropping state, 
+ *  	if we're not in dropping state,
  * 			then we need to decide if it's time to enter and
  * 				do the initial drop.
  */
