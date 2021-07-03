@@ -19,7 +19,7 @@
 static int my_codel_qdisc_enqueue(packet_t *pkt, struct Qdisc *sch,
 				  struct sk_buff **to_free);
 
-static packet_t *my_codel_qdisc_dequeue(packet_t *pkt);
+static packet_t *my_codel_qdisc_dequeue(struct Qdisc *sch);
 
 static int my_codel_init(struct Qdisc *sch, struct nlattr *opt,
 			 struct netlink_ext_ack *extack);
@@ -60,5 +60,5 @@ static void __exit my_codel_module_exit(void)
 
 module_init(my_codel_module_init) module_exit(my_codel_module_exit)
 
-MODULE_DESCRIPTION("My CoDel Implementation");
+	MODULE_DESCRIPTION("My CoDel Implementation");
 MODULE_AUTHOR("Xiong Huchao");

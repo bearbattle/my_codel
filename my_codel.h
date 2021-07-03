@@ -3,7 +3,7 @@
  * By Bear
  * 2021.06.30 - 2021.07.04
  * @see: https://queue.acm.org/appendices/codel.html
- * */
+ */
 
 #ifndef LINUX_5_8_MY_CODEL_H
 #define LINUX_5_8_MY_CODEL_H
@@ -96,7 +96,7 @@ struct my_codel_state {
  * ecn_mark:	number of packets we ECN marked instead of dropping
  * ce_mark:	number of packets CE marked because sojourn time was above ce_threshold
  */
-struct codel_stats {
+struct my_codel_stats {
 	u32 maxpacket;
 	u32 drop_count;
 	u32 drop_len;
@@ -180,5 +180,15 @@ static u32 my_bytes(struct Qdisc *sch)
 {
 	return sch->qstats.backlog;
 }
+
+static const my_queue_t base_queue = { .enqueue = my_enqueue,
+				       .dequeue = my_dequeue,
+				       .bytes = my_bytes };
+
+struct my_codel_sched_data {
+	struct my_codel_state state;
+	struct my_codel_stats stats;
+	u32 drop_overlimit;
+};
 
 #endif /* LINUX_5_8_MY_CODEL_H */
