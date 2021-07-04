@@ -272,7 +272,8 @@ static my_dodeque_result my_codel_dodeque(my_codel_time_t now,
 				/* just went above from below. if we stay above */
 				/* for at least interval we'll say it's ok to drop */
 				state->first_above_time = now + interval;
-			} else if (my_codel_time_after(now, state->first_above_time)) {
+			} else if (my_codel_time_after(
+					   now, state->first_above_time)) {
 				r.ok_to_drop = 1;
 			}
 		}
@@ -291,5 +292,69 @@ static my_dodeque_result my_codel_dodeque(my_codel_time_t now,
  * 			then we need to decide if it's time to enter and
  * 				do the initial drop.
  */
+
+packet_t *my_codel_deque(struct Qdisc *sch, struct my_codel_state *state)
+{
+	my_codel_time_t now = clock();
+	my_dodeque_result r = my_codel_dodeque(now, sch, state);
+	if (r.p == NULL) {
+		/* an empty queue takes us out of dropping state */
+		dropping = 0;
+		return r.p;
+	}
+	if (dropping) {
+		if (!r.ok_to_drop) {
+			/* sojourn time below target - leave dropping state */
+			dropping = 0;
+		} else if (my_codel_time_after_eq(now, state->drop_next)) {
+			/**
+             * It's time for the next drop. Drop the current packet and dequeue the next.
+             * The dequeue might take us out of dropping state.
+             * If not, schedule the next drop.
+             * A large backlog might result in drop rates so high that the next drop should happen now;
+             * hence, the while loop.
+             */
+			while (my_codel_time_after_eq(now, state->drop_next) &&
+			       state->dropping) {
+				drop(r.p);
+				++state->count;
+				r = my_codel_dodeque(now, sch, state);
+				if (!r.ok_to_drop)
+					/* leave dropping state */
+					state->dropping = 0;
+				else
+					/* schedule the next drop. */
+					state->drop_next = my_codel_control_law(
+						state->drop_next, state->count);
+			}
+		}
+		/**
+         * If we get here, then we're not in dropping state.
+         * If the sojourn time has been above target for interval,
+         * 	then we decide whether it's time to enter dropping state.
+         * We do so if we've been either in dropping state recently or above target fora relatively long time.
+         * The "recently" check helps ensure that when we're successfully controlling the queue
+         * we react quickly (in one interval) and start with the drop rate that controlled the queue last time
+         * rather than relearn the correct rate from scratch.
+         * If we haven't been dropping recently,
+         * 	the "long time above" check adds some hysteresis to the state entry so
+         *  we don't drop on a slightly bigger-than-normal traffic pulse into an otherwise quiet queue.
+         */
+	} else if (r.ok_to_drop && ((now - drop_next < interval) ||
+				    (now - first_above_time >= interval))) {
+		drop(r.p);
+		r = dodeque();
+		dropping = 1;
+
+		/* If we're in a drop cycle, the drop rate that controlled the queue */
+		/* on the last cycle is a good starting point to control it now. */
+		if (now - drop_next < interval)
+			count = count > 2 ? count - 2 : 1;
+		else
+			count = 1;
+		drop_next = control_law(now);
+	}
+	return (r.p);
+}
 
 #endif /* LINUX_5_8_MY_CODEL_H */
