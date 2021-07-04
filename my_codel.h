@@ -218,7 +218,7 @@ static void my_codel_control_init(struct my_codel_control *control)
 static int my_codel_enqueue(packet_t *pkt, struct Qdisc *sch)
 {
 	my_codel_set_enqueue_time(pkt);
-	base_queue.enqueue(pkt, sch);
+	return base_queue.enqueue(pkt, sch);
 }
 
 /**
