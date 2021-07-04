@@ -253,25 +253,26 @@ typedef struct {
 } my_dodeque_result;
 
 static my_dodeque_result my_codel_dodeque(my_codel_time_t now,
-					  struct Qdisc *sch)
+					  struct Qdisc *sch,
+					  struct my_codel_state *state)
 {
 	my_dodeque_result r = { .p = base_queue.dequeue(sch),
 				.ok_to_drop = false };
 	if (r.p == NULL) {
-		first_above_time = 0;
+		state->first_above_time = 0;
 	} else {
 		my_codel_time_t sojourn_time =
 			now - my_codel_get_enqueue_time(r.p);
 		if (my_codel_time_before(sojourn_time, target) ||
 		    base_queue.bytes(sch) < maxpacket) {
 			/* went below so we'll stay below for at least interval */
-			first_above_time = 0;
+			state->first_above_time = 0;
 		} else {
-			if (first_above_time == 0) {
+			if (state->first_above_time == 0) {
 				/* just went above from below. if we stay above */
 				/* for at least interval we'll say it's ok to drop */
-				first_above_time = now + interval;
-			} else if (my_codel_time_after(now, first_above_time)) {
+				state->first_above_time = now + interval;
+			} else if (my_codel_time_after(now, state->first_above_time)) {
 				r.ok_to_drop = 1;
 			}
 		}
