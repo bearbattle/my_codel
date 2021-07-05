@@ -219,7 +219,9 @@ static int my_codel_dump_stats(struct Qdisc *sch, struct gnet_dump *d)
 	return gnet_stats_copy_app(d, &st, sizeof(st));
 }
 
-module_init(my_codel_module_init) module_exit(my_codel_module_exit)
+module_init(my_codel_module_init)
+module_exit(my_codel_module_exit)
 
 	MODULE_DESCRIPTION("My CoDel Implementation");
 MODULE_AUTHOR("Xiong Huchao");
+MODULE_LICENSE("Dual BSD/GPL");
