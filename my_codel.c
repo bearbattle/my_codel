@@ -62,11 +62,16 @@ static int my_codel_qdisc_enqueue(packet_t *pkt, struct Qdisc *sch,
 				  struct sk_buff **to_free)
 {
 	struct my_codel_sched_data *q;
-	if (likely(qdisc_qlen(sch) < sch->limit)) {
+	int qlen;
+	printk_ratelimited("Enqueuing into Qdisc...\n");
+	qlen = qdisc_qlen(sch);
+	if (likely(qlen < sch->limit)) {
+		printk_ratelimited("Enqueued into Qdisc.\n\tCurrent Queue Length: %d", qlen);
 		return my_codel_enqueue(pkt, sch);
 	}
 	q = qdisc_priv(sch);
 	q->drop_overlimit++;
+	printk_ratelimited("Dropping due to long Qdisc.\n\tCurrent Queue Length: %d", qlen);
 	return qdisc_drop(pkt, sch, to_free);
 }
 
@@ -74,6 +79,7 @@ static packet_t *my_codel_qdisc_dequeue(struct Qdisc *sch)
 {
 	struct my_codel_sched_data *q = qdisc_priv(sch);
 	packet_t *pkt = my_codel_deque(sch, &q->state);
+	printk_ratelimited("Dequeuing from Qdisc...\n\tCurrent Queue Length: %d", qdisc_qlen(sch));
 	if (q->stats.drop_count && sch->q.qlen) {
 		qdisc_tree_reduce_backlog(sch, q->stats.drop_count,
 					  q->stats.drop_len);
@@ -108,6 +114,7 @@ static int my_codel_init(struct Qdisc *sch, struct nlattr *opt,
 	} else {
 		sch->flags &= ~TCQ_F_CAN_BYPASS;
 	}
+	printk_ratelimited("My CoDel Init Finished!\n");
 	return 0;
 }
 
