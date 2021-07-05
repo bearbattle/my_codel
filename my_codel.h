@@ -84,6 +84,7 @@ struct my_codel_state {
 	my_codel_time_t drop_next;
 	uint32_t count;
 	uint32_t last_count;
+	uint32_t last_delay;
 	my_flag_t dropping;
 };
 
@@ -219,6 +220,7 @@ static void my_codel_state_init(struct my_codel_state *state)
 	state->first_above_time = 0;
 	state->drop_next = 0;
 	state->last_count = state->count = 0;
+	state->last_delay = 0;
 	state->dropping = false;
 }
 
@@ -281,6 +283,7 @@ static my_dodeque_result my_codel_dodeque(my_codel_time_t now,
 	} else {
 		my_codel_time_t sojourn_time =
 			now - my_codel_get_enqueue_time(r.p);
+		state->last_delay = sojourn_time;
 		if (my_codel_time_before(sojourn_time, target) ||
 		    base_queue.bytes(sch) < maxpacket) {
 			/* went below so we'll stay below for at least interval */
